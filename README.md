@@ -7,6 +7,139 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Laravel N+1 Problemi Örneği
+
+Bu proje, Laravel uygulamalarında sık karşılaşılan **N+1 Query Problemi**'ni göstermek ve çözmek için oluşturulmuştur.
+
+### N+1 Problemi Nedir?
+
+N+1 problemi, veritabanı sorgularında verimsizliğe neden olan bir durumdur:
+
+- 1 sorgu: İlçeleri (counties) listele
+- N sorgu: Her ilçe için şehir (city) bilgisini ayrı ayrı sorgula
+
+Bu şekilde 1 şehir + 200 ilçe varsa = **201 sorgu** yapılır.
+
+**Örnek (Sorunlu Kod):**
+```php
+$counties = County::all();
+
+foreach ($counties as $county) {
+    echo $county->city->name; // Her döngüde 1 sorgu = 200 sorgu
+}
+```
+
+### Çözüm: Eager Loading
+
+Laravel'in `with()` metodu kullanarak ilişkili verileri önceden yükleyin:
+
+**Düzeltilmiş Kod:**
+```php
+$counties = County::with('city')->get(); // 2 sorgu
+
+foreach ($counties as $county) {
+    echo $county->city->name; // Sorgu yapılmaz, zaten yüklü
+}
+```
+
+### Bu Projede Deneylemek
+
+#### 1. Veritabanını Hazırla
+```bash
+php artisan migrate:fresh --seed
+```
+
+Bu komut:
+- 20 şehir oluşturur
+- Her şehir için 10 ilçe oluşturur (toplam 200 ilçe)
+
+#### 2. N+1 Problemini Görün (Sorunlu Yol)
+```bash
+php artisan tinker
+```
+
+```php
+$counties = County::all();
+
+// Debug Bar'ı açın veya:
+// DB::enableQueryLog();
+
+foreach ($counties as $county) {
+    echo $county->city->name . "\n";
+}
+
+// DB::getQueryLog() ile sorguları görün - ~200+ sorgu!
+```
+
+#### 3. Çözümü Deneyin (İyileştirilmiş Yol)
+```php
+$counties = County::with('city')->get();
+
+foreach ($counties as $county) {
+    echo $county->city->name . "\n";
+}
+
+// DB::getQueryLog() ile sorguları görün - Sadece 2 sorgu!
+```
+
+#### 4. Web Uygulaması
+```bash
+php artisan serve
+```
+
+Ev sayfasında tablo verilerini görüntüleyin ve Debug Bar'da sorguları izleyin.
+
+### Model İlişkileri
+
+**County Model:**
+```php
+public function city()
+{
+    return $this->belongsTo(City::class);
+}
+```
+
+**City Model:**
+```php
+public function counties()
+{
+    return $this->hasMany(County::class);
+}
+```
+
+### Performans Karşılaştırması
+
+| Yöntem | Sorgu Sayısı | Hız |
+|--------|-------------|-----|
+| N+1 Problemi | 201 | Yavaş ❌ |
+| Eager Loading | 2 | Hızlı ✅ |
+
+### Diğer Eager Loading Yöntemleri
+
+```php
+// İlişkili verileri yükle
+County::with('city')->get();
+
+// Birden çok ilişki
+County::with('city', 'region')->get();
+
+// İç içe ilişkiler
+County::with('city.region')->get();
+
+// Koşullu eager loading
+County::with(['city' => function ($query) {
+    $query->where('active', true);
+}])->get();
+```
+
+### Kaynaklar
+
+- [Laravel Eloquent: Relationships](https://laravel.com/docs/eloquent-relationships)
+- [Laravel Eloquent: Eager Loading](https://laravel.com/docs/eloquent-relationships#eager-loading)
+- [Laravel Debugbar](https://github.com/barryvdh/laravel-debugbar)
+
+---
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
@@ -28,18 +161,6 @@ Laravel has the most extensive and thorough [documentation](https://laravel.com/
 In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
 
 You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
-```
-
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
 ## Contributing
 
